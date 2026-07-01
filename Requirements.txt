@@ -1,0 +1,26 @@
+# ── Core ──────────────────────────────────────────────────
+streamlit>=1.35.0
+plotly>=5.20.0
+pandas>=2.0.0
+numpy>=1.26.0
+python-dotenv>=1.0.0
+
+# ── Upstox WebSocket ──────────────────────────────────────
+aiohttp>=3.9.0
+websockets>=12.0
+protobuf>=4.25.0
+
+# ── Machine Learning ──────────────────────────────────────
+scikit-learn>=1.4.0
+xgboost>=2.0.0
+lightgbm>=4.3.0
+catboost>=1.2.0
+
+# ── Deep Learning (LSTM) — optional, comment out if slow ──
+# tensorflow>=2.15.0
+
+# ── Options / Finance ─────────────────────────────────────
+scipy>=1.12.0
+
+# ── Alerts ────────────────────────────────────────────────
+# plyer>=2.1.0        # desktop notifications (optional)
