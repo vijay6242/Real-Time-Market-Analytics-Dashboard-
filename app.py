@@ -1088,6 +1088,7 @@ def tab_breadth():
     st.plotly_chart(fig3, width="stretch")
 
 # ── Tab 11: Performance Dashboard ────────────────────────
+# ── Tab 11: Performance Dashboard ────────────────────────
 def tab_performance():
     st.markdown('<div class="sec">🏆 Performance Dashboard</div>',
                 unsafe_allow_html=True)
@@ -1099,7 +1100,10 @@ def tab_performance():
         cols = st.columns(5)
         for i,(k,v) in enumerate(list(m.items())[:10]):
             cols[i%5].metric(k,v)
-        st.plotly_chart(returns_heatmap(df,name), width="stretch")
+            
+        # FIX: Added a unique key to prevent duplicate ID collisions
+        st.plotly_chart(returns_heatmap(df,name), width="stretch", key=f"perf_heatmap_{name}")
+        
         st.markdown("---")
 
 # ── Tab 12: ML Predictions ────────────────────────────────
