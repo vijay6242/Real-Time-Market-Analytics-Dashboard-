@@ -31,16 +31,18 @@ from data import (
 )
 from websocket import ws_hub, tick_store
 from logger import get_logger
+import database as db
 
 load_dotenv()
 logger = get_logger(__name__)
+db.init_db()
 
 # ─────────────────────────────────────────────
 # Page config
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="📈 Market Dashboard",
-    page_icon="📈",
+    page_title="Market Pulse · NSE Live",
+    page_icon="◆",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -49,41 +51,170 @@ st.set_page_config(
 # Dark theme CSS
 # ─────────────────────────────────────────────
 st.markdown("""<style>
-html,body,[class*="css"]{font-family:'JetBrains Mono','Courier New',monospace}
-[data-testid="stAppViewContainer"]{background:#0d1117;color:#e6edf3}
-[data-testid="stSidebar"]{background:#161b22;border-right:1px solid #21262d}
-[data-testid="stSidebar"] *{color:#e6edf3!important}
-[data-testid="metric-container"]{background:#161b22;border:1px solid #21262d;
-  border-radius:10px;padding:12px 16px}
-[data-testid="metric-container"] [data-testid="stMetricLabel"]{
-  color:#8b949e!important;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
-[data-testid="metric-container"] [data-testid="stMetricValue"]{
-  color:#e6edf3!important;font-size:20px;font-weight:700}
-.ticker{background:#0a0d12;border-bottom:1px solid #21262d;
-  padding:6px 16px;display:flex;gap:28px;overflow-x:auto;white-space:nowrap}
-.ti{display:inline-flex;flex-direction:column;min-width:110px}
-.tn{font-size:9px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px}
-.tp{font-size:16px;font-weight:700;color:#e6edf3;letter-spacing:-.3px}
-.tu{font-size:10px;color:#3fb950}.td{font-size:10px;color:#f85149}
-.sec{font-size:9px;font-weight:700;color:#8b949e;letter-spacing:.8px;
-  text-transform:uppercase;border-bottom:1px solid #21262d;
-  padding-bottom:5px;margin-bottom:8px}
-.kpi{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:10px 14px}
-.risk-low{color:#3fb950;font-weight:700}
-.risk-med{color:#d29922;font-weight:700}
-.risk-hi{color:#f85149;font-weight:700}
-::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:#0d1117}
-::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
-stDataFrame{background:#161b22}
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#0a0b0d; --bg2:#111318; --panel:#14171d; --panel-2:#1a1e25;
+  --border:#242a33; --border-soft:#1c212a;
+  --text:#eef1f6; --muted:#8a93a3; --muted-2:#5c6576;
+  --amber:#f5b64c; --amber-soft:rgba(245,182,76,.14); --amber-glow:rgba(245,182,76,.35);
+  --green:#26d07c; --green-soft:rgba(38,208,124,.12);
+  --red:#ff5c72; --red-soft:rgba(255,92,114,.12);
+  --blue:#5b9dff;
+  --radius:12px;
+}
+
+html,body,[class*="css"]{font-family:'Inter',sans-serif; color:var(--text)}
+h1,h2,h3,h4,h5,h6{font-family:'Space Grotesk',sans-serif!important; letter-spacing:-.2px}
+code,pre,.mono,[data-testid="stMetricValue"],.tp,.ti .tp{font-family:'JetBrains Mono',monospace!important}
+
+/* ── App shell ─────────────────────────────────────── */
+[data-testid="stAppViewContainer"]{
+  background:
+    radial-gradient(1200px 500px at 15% -10%, rgba(245,182,76,.06), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, rgba(91,157,255,.04), transparent 55%),
+    var(--bg);
+}
+[data-testid="stHeader"]{background:transparent}
+.block-container{padding-top:1.1rem; max-width:1500px}
+
+/* ── Sidebar ───────────────────────────────────────── */
+[data-testid="stSidebar"]{
+  background:linear-gradient(180deg,var(--panel-2) 0%, var(--bg2) 100%);
+  border-right:1px solid var(--border);
+}
+[data-testid="stSidebar"] *{color:var(--text)!important}
+[data-testid="stSidebar"] hr{border-color:var(--border-soft); margin:14px 0}
+.brand{display:flex; align-items:center; gap:9px; padding:2px 0 0 0}
+.brand-mark{width:9px; height:9px; border-radius:2px; background:var(--amber);
+  box-shadow:0 0 10px var(--amber-glow); flex-shrink:0}
+.brand-title{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px;
+  letter-spacing:.2px; color:var(--text)}
+.brand-sub{font-size:10.5px; color:var(--muted-2); letter-spacing:.6px;
+  text-transform:uppercase; margin:2px 0 0 18px}
+[data-testid="stSidebar"] h3{
+  font-size:11px!important; font-weight:700!important; letter-spacing:.9px;
+  text-transform:uppercase; color:var(--muted)!important; margin-top:2px!important;
+}
+
+/* status badge */
+.badge{display:inline-flex; align-items:center; gap:6px; font-size:11.5px;
+  font-weight:600; padding:4px 10px; border-radius:999px; border:1px solid var(--border)}
+.dot{width:7px; height:7px; border-radius:50%; flex-shrink:0}
+.dot-live{background:var(--green); box-shadow:0 0 8px var(--green); animation:pulse 1.8s infinite}
+.dot-off{background:var(--muted-2)}
+.dot-err{background:var(--red); box-shadow:0 0 8px var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── Section headers (signature: amber terminal tick) ─ */
+.sec{
+  display:flex; align-items:center; gap:8px;
+  font-family:'Space Grotesk',sans-serif; font-size:12.5px; font-weight:700;
+  color:var(--text); letter-spacing:.3px; text-transform:uppercase;
+  padding:2px 0 10px 0; margin-bottom:14px;
+  border-bottom:1px solid var(--border-soft); position:relative;
+}
+.sec::before{content:"▍"; color:var(--amber); font-size:14px; line-height:0}
+.sec::after{content:""; position:absolute; left:0; bottom:-1px; width:46px; height:1px;
+  background:linear-gradient(90deg,var(--amber),transparent)}
+
+/* ── Metric cards ──────────────────────────────────── */
+[data-testid="stMetric"]{
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px 16px 12px 16px; position:relative; overflow:hidden;
+  transition:border-color .15s ease, transform .15s ease;
+}
+[data-testid="stMetric"]::before{content:""; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,var(--amber),transparent 70%)}
+[data-testid="stMetric"]:hover{border-color:#3a4150; transform:translateY(-1px)}
+[data-testid="stMetricLabel"]{color:var(--muted)!important; font-size:10.5px!important;
+  text-transform:uppercase; letter-spacing:.6px; font-weight:600!important}
+[data-testid="stMetricValue"]{color:var(--text)!important; font-size:21px!important; font-weight:600!important}
+[data-testid="stMetricDelta"] svg{display:none}
+
+/* ── Ticker tape ───────────────────────────────────── */
+.pulse-bar{height:2px; width:100%; background-size:200% 100%;
+  animation:shimmer 3.5s linear infinite}
+.pulse-up{background-image:linear-gradient(90deg,transparent,var(--green),transparent)}
+.pulse-down{background-image:linear-gradient(90deg,transparent,var(--red),transparent)}
+@keyframes shimmer{0%{background-position:0% 0}100%{background-position:200% 0}}
+.ticker{background:var(--panel); border:1px solid var(--border); border-top:none;
+  border-radius:0 0 var(--radius) var(--radius);
+  padding:10px 18px; display:flex; gap:30px; overflow-x:auto; white-space:nowrap;
+  margin-bottom:18px;}
+.ticker::-webkit-scrollbar{display:none}
+.ti{display:inline-flex; flex-direction:column; min-width:112px; gap:2px}
+.tn{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; font-weight:600}
+.tp{font-size:16px; font-weight:600; color:var(--text); letter-spacing:-.2px}
+.tu{font-size:10.5px; color:var(--green); font-weight:600}
+.td{font-size:10.5px; color:var(--red); font-weight:600}
+
+/* ── Buttons ───────────────────────────────────────── */
+.stButton>button, button[kind="secondary"]{
+  background:var(--panel-2)!important; border:1px solid var(--border)!important;
+  color:var(--text)!important; border-radius:8px!important; font-weight:600!important;
+  transition:all .15s ease!important;
+}
+.stButton>button:hover, button[kind="secondary"]:hover{
+  border-color:var(--amber)!important; color:var(--amber)!important;
+}
+button[kind="primary"]{
+  background:var(--amber)!important; border:1px solid var(--amber)!important;
+  color:#1a1305!important; border-radius:8px!important; font-weight:700!important;
+  box-shadow:0 0 0 rgba(245,182,76,0); transition:box-shadow .15s ease!important;
+}
+button[kind="primary"]:hover{box-shadow:0 0 16px var(--amber-glow)!important}
+
+/* ── Inputs ────────────────────────────────────────── */
+[data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,
+[data-baseweb="select"] > div, [data-baseweb="input"]{
+  background:var(--panel)!important; border:1px solid var(--border)!important;
+  color:var(--text)!important; border-radius:8px!important;
+}
+[data-testid="stTextInput"] input:focus, [data-baseweb="select"] > div:focus-within{
+  border-color:var(--amber)!important; box-shadow:0 0 0 1px var(--amber)!important;
+}
+[data-baseweb="radio"] label, [data-baseweb="checkbox"] label{color:var(--text)!important}
+[data-testid="stSlider"] div[role="slider"]{background:var(--amber)!important; border-color:var(--amber)!important}
+[data-testid="stSlider"] .st-emotion-cache-1dj0hjr, [data-testid="stTickBar"]{background:var(--border)!important}
+div[data-baseweb="slider"] > div > div{background:var(--amber)!important}
+[data-testid="stToggle"] [aria-checked="true"]{background:var(--amber)!important}
+
+/* ── Tabs ──────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"]{gap:2px; border-bottom:1px solid var(--border-soft)}
+.stTabs [data-baseweb="tab"]{
+  font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px;
+  color:var(--muted); padding:8px 14px; border-radius:8px 8px 0 0;
+}
+.stTabs [aria-selected="true"]{color:var(--amber)!important}
+.stTabs [data-baseweb="tab-highlight"]{background:var(--amber)!important; height:2px}
+
+/* ── Alerts / callouts ─────────────────────────────── */
+[data-testid="stAlertContainer"]{border-radius:10px!important; border:1px solid var(--border)!important}
+
+/* ── DataFrames & tables ───────────────────────────── */
+[data-testid="stDataFrame"]{border:1px solid var(--border); border-radius:10px; overflow:hidden}
+
+/* ── Misc panels ───────────────────────────────────── */
+.kpi{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:12px 15px}
+.risk-low{color:var(--green); font-weight:700}
+.risk-med{color:var(--amber); font-weight:700}
+.risk-hi{color:var(--red); font-weight:700}
+[data-testid="stExpander"]{background:var(--panel); border:1px solid var(--border)!important; border-radius:10px!important}
+
+/* ── Scrollbars ────────────────────────────────────── */
+::-webkit-scrollbar{width:6px; height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border); border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--amber)}
 </style>""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # Color palette & Plotly defaults
 # ─────────────────────────────────────────────
-C = dict(bg="#0d1117", panel="#161b22", border="#21262d", text="#e6edf3",
-         muted="#8b949e", green="#3fb950", red="#f85149", blue="#58a6ff",
-         orange="#d29922", purple="#bc8cff", cyan="#39d353", yellow="#e3b341")
+C = dict(bg="#0a0b0d", panel="#14171d", border="#242a33", text="#eef1f6",
+         muted="#8a93a3", green="#26d07c", red="#ff5c72", blue="#5b9dff",
+         orange="#f5b64c", purple="#bc8cff", cyan="#39d353", yellow="#f5b64c")
 
 CHART = dict(
     paper_bgcolor=C["panel"], plot_bgcolor=C["bg"],
@@ -101,13 +232,52 @@ CHART = dict(
 # ─────────────────────────────────────────────
 # Session state & Global Helpers
 # ─────────────────────────────────────────────
+def _load_token() -> str:
+    """DB is the source of truth (survives session resets); .env is the
+    one-time seed the first time the app runs against a fresh database."""
+    tok = db.get_access_token("")
+    if not tok:
+        tok = os.getenv("UPSTOX_ACCESS_TOKEN", "")
+        if tok:
+            db.set_access_token(tok)
+    return tok
+
+def _load_watchlist() -> dict:
+    default = {"NSE_INDEX|Nifty 50":"NIFTY 50",
+               "NSE_INDEX|Nifty Bank":"NIFTY BANK",
+               "NSE_INDEX|India VIX":"INDIA VIX"}
+    saved = db.get_watchlist()
+    if saved:
+        return saved
+    for key, name in default.items():
+        db.add_to_watchlist(name, key)
+    return default
+
+def _load_settings() -> dict:
+    base = dict(rf_rate=6.5, adx_period=14, rsi_period=14,
+                st_multiplier=3.0, st_period=10, theme="Dark")
+    saved = db.get_all_settings()
+    for k in base:
+        if k in saved:
+            try: base[k] = type(base[k])(saved[k])
+            except (TypeError, ValueError): pass
+    return base
+
+def _load_alert_rules() -> list:
+    rules = []
+    for row in db.get_alerts(status="active"):
+        rules.append({
+            "id": row["id"], "symbol": row["symbol"], "type": row["alert_type"],
+            "value": row["alert_value"], "note": row.get("note",""),
+            "active": True, "created": row["created_at"],
+        })
+    return rules
+
 def _init():
     defaults = dict(
-        access_token=os.getenv("UPSTOX_ACCESS_TOKEN",""),
+        access_token=_load_token(),
         ws_started=False,
-        watchlist={"NSE_INDEX|Nifty 50":"NIFTY 50",
-                   "NSE_INDEX|Nifty Bank":"NIFTY BANK",
-                   "NSE_INDEX|India VIX":"INDIA VIX"},
+        watchlist=_load_watchlist(),
         selected_chart="NIFTY 50",
         chart_period="1Y",
         auto_refresh=True,
@@ -116,10 +286,9 @@ def _init():
         search_results=[],
         hist_cache={},
         ml_cache={},
-        alert_rules=[],
+        alert_rules=_load_alert_rules(),
         alert_log=[],
-        settings=dict(rf_rate=6.5, adx_period=14, rsi_period=14,
-                      st_multiplier=3.0, st_period=10, theme="Dark"),
+        settings=_load_settings(),
     )
     for k,v in defaults.items():
         if k not in st.session_state:
@@ -155,6 +324,11 @@ def get_hist(name: str) -> pd.DataFrame:
         df = load_historical(name)
         if not df.empty:
             df = compute_technicals(df)
+            try:
+                db.save_historical_df(name, df)
+                db.save_technical_indicators(name, df)
+            except Exception as e:
+                logger.warning(f"[DB] Could not persist {name}: {e}")
         st.session_state.hist_cache[name] = df
     return st.session_state.hist_cache[name]
 
@@ -337,7 +511,11 @@ def returns_heatmap(df: pd.DataFrame, name: str) -> go.Figure:
 # ─────────────────────────────────────────────
 def sidebar():
     with st.sidebar:
-        st.markdown("## 📈 Market Dashboard")
+        st.markdown(
+            '<div class="brand"><span class="brand-mark"></span>'
+            '<span class="brand-title">MARKET PULSE</span></div>'
+            '<div class="brand-sub">NSE Live Terminal</div>',
+            unsafe_allow_html=True)
         st.caption("NIFTY 50 · NIFTY BANK · VIX + Live")
         st.markdown("---")
 
@@ -345,20 +523,21 @@ def sidebar():
         st.markdown("### 🔌 Upstox Connection")
         tok = st.text_input("Access Token", value=st.session_state.access_token,
                              type="password", placeholder="Paste your token...")
+        if tok != st.session_state.access_token:
+            db.set_access_token(tok)
         st.session_state.access_token = tok
         c1,c2 = st.columns(2)
-        if c1.button("▶ Connect", use_container_width=True, disabled=not tok):
+        if c1.button("▶ Connect", use_container_width=True, disabled=not tok,
+                      type="primary"):
             _start_ws()
         if c2.button("⏹ Stop", use_container_width=True):
             ws_hub.stop(); st.session_state.ws_started = False
 
         status = ws_hub.status
-        css = ("status-ok" if "Connected" in status
-               else "status-err" if "Error" in status else "status-warn")
-        color = C["green"] if "Connected" in status else \
-                C["red"] if "Error" in status else C["orange"]
-        st.markdown(f"<span style='color:{color};font-size:12px;font-weight:700'>"
-                    f"● {status}</span>", unsafe_allow_html=True)
+        dot = ("dot-live" if "Connected" in status
+               else "dot-err" if "Error" in status else "dot-off")
+        st.markdown(f'<span class="badge"><span class="dot {dot}"></span>{status}</span>',
+                    unsafe_allow_html=True)
         if ws_hub.is_running:
             d = ws_hub.diagnostics
             st.caption(f"🔢 {d['subscribed_keys']} subs | 📡 {d['tick_count']} ticks")
@@ -383,6 +562,7 @@ def sidebar():
             if st.button(f"+ {lbl}", key=f"add_{r['instrument_key']}",
                           use_container_width=True):
                 st.session_state.watchlist[r['instrument_key']] = r['symbol']
+                db.add_to_watchlist(r['symbol'], r['instrument_key'])
                 ws_hub.add_subscription(r['instrument_key'])
                 st.session_state.search_results = []
                 st.rerun()
@@ -396,6 +576,7 @@ def sidebar():
         for i,(name,key) in enumerate(popular.items()):
             if cols[i%2].button(name, key=f"q_{key}", use_container_width=True):
                 st.session_state.watchlist[key] = name
+                db.add_to_watchlist(name, key)
                 ws_hub.add_subscription(key); st.rerun()
 
         st.markdown("---")
@@ -431,6 +612,7 @@ def ticker_tape():
                   "NSE_INDEX|Nifty Bank":"NIFTY BANK",
                   "NSE_INDEX|India VIX":"INDIA VIX"},
                **st.session_state.watchlist}
+    nifty_pct = 0
     for key,name in keys.items():
         tick = ticks.get(key,{})
         ltp  = tick.get("ltp",0)
@@ -441,18 +623,25 @@ def ticker_tape():
             if not df.empty:
                 ltp = df["Close"].iloc[-1]
                 pct = df["Pct_Change"].iloc[-1] if "Pct_Change" in df.columns else 0
+        if name == "NIFTY 50":
+            nifty_pct = pct
         if ltp == 0: continue
         sign = "▲" if pct>=0 else "▼"
         cls  = "tu" if pct>=0 else "td"
         items += (f'<div class="ti"><span class="tn">{name}</span>'
                   f'<span class="tp">₹{ltp:,.2f}</span>'
                   f'<span class="{cls}">{sign} {abs(pct):.2f}% {ts}</span></div>')
-    mkt = "🟢 OPEN" if is_market_open() else "🔴 CLOSED"
-    now_s = datetime.now().strftime("%d %b %Y %H:%M:%S")
+    mkt_open = is_market_open()
+    mkt_dot  = "dot-live" if mkt_open else "dot-off"
+    mkt_lbl  = "MARKET OPEN" if mkt_open else "MARKET CLOSED"
+    now_s = datetime.now().strftime("%d %b %Y · %H:%M:%S")
+    pulse_cls = "pulse-up" if nifty_pct >= 0 else "pulse-down"
+    st.markdown(f'<div class="pulse-bar {pulse_cls}"></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="ticker">{items}'
-                f'<div class="ti" style="margin-left:auto">'
+                f'<div class="ti" style="margin-left:auto; align-items:flex-end">'
                 f'<span class="tn">{now_s}</span>'
-                f'<span class="tp" style="font-size:12px">{mkt}</span></div></div>',
+                f'<span class="badge" style="margin-top:3px">'
+                f'<span class="dot {mkt_dot}"></span>{mkt_lbl}</span></div></div>',
                 unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
@@ -591,6 +780,7 @@ def tab_live_market():
                 remove_keys.append(key)
     for k in remove_keys:
         del st.session_state.watchlist[k]
+        db.remove_from_watchlist(k)
         ws_hub.remove_subscription(k)
     if remove_keys: st.rerun()
 
@@ -1126,6 +1316,10 @@ def tab_ml():
         with st.spinner("Predicting ..."):
             pred = predict_tomorrow(df50, vix_series)
         st.session_state.ml_cache["pred"] = pred
+        try:
+            db.save_prediction("NIFTY 50", pred, model_name="ensemble_vote")
+        except Exception as e:
+            logger.warning(f"[DB] Could not save prediction: {e}")
 
     if run_now:
         with st.spinner("Training all models — please wait (~30s) ..."):
@@ -1226,7 +1420,9 @@ def tab_alerts():
         a_val    = c3.number_input("Value", value=24000.0, key="a_val")
         a_note   = c4.text_input("Note", placeholder="e.g. Breakout", key="a_note")
         if st.button("Add Alert"):
+            new_id = db.add_alert(a_symbol, a_type, a_val, a_note)
             st.session_state.alert_rules.append({
+                "id": new_id,
                 "symbol": a_symbol, "type": a_type,
                 "value": a_val,     "note": a_note,
                 "active": True,     "created": datetime.now().strftime("%H:%M:%S"),
@@ -1242,6 +1438,8 @@ def tab_alerts():
                      f"_{rule.get('note','')}_")
             c2.write(f"Added {rule['created']}")
             if c3.button("🗑", key=f"del_alert_{i}"):
+                if rule.get("id") is not None:
+                    db.delete_alert(rule["id"])
                 st.session_state.alert_rules.pop(i); st.rerun()
 
         # Check alerts
@@ -1263,6 +1461,8 @@ def tab_alerts():
                        f"(LTP: {ltp:.2f})  [{datetime.now().strftime('%H:%M:%S')}]")
                 st.warning(msg)
                 st.session_state.alert_log.append(msg)
+                if rule.get("id") is not None:
+                    db.mark_alert_triggered(rule["id"])
 
         if st.session_state.alert_log:
             for log in st.session_state.alert_log[-10:]:
@@ -1343,6 +1543,11 @@ def tab_settings():
         s["st_multiplier"] = st.number_input("ST Multiplier", value=s["st_multiplier"],
                                               min_value=1.0, max_value=6.0, step=0.5)
 
+    if st.button("💾 Save Settings"):
+        for k, v in s.items():
+            db.set_setting(k, v)
+        st.success("Settings saved — will be restored on next launch.")
+
     st.markdown("---")
     st.markdown("**Clear Caches**")
     if st.button("🗑 Clear Historical Cache"):
@@ -1374,10 +1579,12 @@ def main():
         _start_ws()
 
     st.markdown(
-        "<h1 style='color:#e6edf3;margin-bottom:2px;font-size:22px'>"
-        "📈 Real-Time Market Analytics Dashboard</h1>"
-        "<p style='color:#8b949e;margin:0;font-size:11px'>"
-        "NIFTY 50 · NIFTY BANK · India VIX — Historical + Live Upstox | "
+        "<h1 style='color:var(--text);margin-bottom:2px;font-size:23px;"
+        "font-family:Space Grotesk,sans-serif;font-weight:700'>"
+        "Real-Time Market Analytics</h1>"
+        "<p style='color:var(--muted);margin:0 0 14px 0;font-size:11.5px;"
+        "letter-spacing:.2px'>"
+        "NIFTY 50 · NIFTY BANK · India VIX — Historical + Live Upstox &nbsp;·&nbsp; "
         "ADX · SuperTrend · VWAP · Option Chain · ML Predictions</p>",
         unsafe_allow_html=True)
 
