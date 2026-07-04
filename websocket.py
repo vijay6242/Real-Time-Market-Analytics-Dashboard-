@@ -30,6 +30,16 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
+# Optional DB persistence — imported lazily/guarded so websocket.py has no
+# hard dependency on the database module (keeps it testable standalone).
+try:
+    import database as db
+    _DB_AVAILABLE = True
+except ImportError:
+    _DB_AVAILABLE = False
+
+_TICK_PERSIST_INTERVAL = 2.0  # seconds — throttle writes per instrument key
+
 # ── Upstox endpoints ──────────────────────────────────────
 _AUTH_URL      = 'https://api.upstox.com/v3/feed/market-data-feed/authorize'
 _BACKOFF_BASE  = 2
@@ -70,6 +80,7 @@ class TickStore:
     def __init__(self):
         self._data: dict = {}
         self._lock = threading.Lock()
+        self._last_persisted: dict = {}   # instrument_key -> monotonic time
 
     def update(self, instrument_key: str, ltp: float):
         with self._lock:
@@ -92,6 +103,24 @@ class TickStore:
                     'timestamp':  datetime.now().strftime("%H:%M:%S"),
                 })
                 self._data[instrument_key]['history'].append(ltp)
+            snapshot = dict(self._data[instrument_key])
+
+        self._maybe_persist(instrument_key, snapshot)
+
+    def _maybe_persist(self, instrument_key: str, snapshot: dict):
+        """Throttled write-through to SQLite so the live tick table doesn't
+        grow by one row per tick (which can be several per second)."""
+        if not _DB_AVAILABLE:
+            return
+        now = time.monotonic()
+        last = self._last_persisted.get(instrument_key, 0)
+        if now - last < _TICK_PERSIST_INTERVAL:
+            return
+        self._last_persisted[instrument_key] = now
+        try:
+            db.save_live_tick(instrument_key, snapshot)
+        except Exception as e:
+            logger.warning(f"[DB] Tick persist failed for {instrument_key}: {e}")
 
     def get(self, instrument_key: str) -> Optional[dict]:
         with self._lock:
