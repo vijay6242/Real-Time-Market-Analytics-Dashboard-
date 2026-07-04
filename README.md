@@ -4,7 +4,7 @@ A professional real-time stock market analytics dashboard built using **Python**
 
 The dashboard combines **historical market analysis**, **live market data**, **technical indicators**, **option chain analytics**, **risk metrics**, and **machine learning predictions** into a single application.
 
-
+<img width="1920" height="1080" alt="Screenshot (1382)" src="https://github.com/user-attachments/assets/4b2778f4-1e26-46fb-856f-c00a7c708894" />
 
 ## 🚀 Features
 
