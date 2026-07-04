@@ -9,8 +9,8 @@ The dashboard combines **historical market analysis**, **live market data**, **t
 ## 🚀 Features
 
 ### 📊 Market Analytics
+<img width="1920" height="1080" alt="Screenshot (1385)" src="https://github.com/user-attachments/assets/0f4d5cdf-c4c9-4a0c-9f10-f72aaa26b446" />
 
-<img width="1920" height="1080" alt="Screenshot (1384)" src="https://github.com/user-attachments/assets/1e208ccf-e150-4277-adbb-4c8a485a5268" />
 
 - Market Overview
 - OHLC Candlestick Charts
@@ -38,7 +38,7 @@ Built-in indicators include:
 ---
 
 ### 📉 Risk Analytics
-
+<img width="1920" height="1080" alt="Screenshot (1386)" src="https://github.com/user-attachments/assets/4af8cf84-83dd-4b18-8796-895e535362d9" />
 - Maximum Drawdown
 - Sharpe Ratio
 - Sortino Ratio
@@ -49,6 +49,8 @@ Built-in indicators include:
 ---
 
 ### 📌 Option Analytics
+
+<img width="1920" height="1080" alt="Screenshot (1387)" src="https://github.com/user-attachments/assets/d90e944e-1ce8-41d3-be3c-381d18ad70cb" />
 
 - Option Chain
 - Put Call Ratio (PCR)
