@@ -9,7 +9,9 @@ The dashboard combines **historical market analysis**, **live market data**, **t
 ## 🚀 Features
 
 ### 📊 Market Analytics
-- Live Market Dashboard
+
+<img width="1920" height="1080" alt="Screenshot (1384)" src="https://github.com/user-attachments/assets/1e208ccf-e150-4277-adbb-4c8a485a5268" />
+
 - Market Overview
 - OHLC Candlestick Charts
 - Technical Indicators
@@ -21,7 +23,7 @@ The dashboard combines **historical market analysis**, **live market data**, **t
 - Risk Analytics
 
 ### 📈 Technical Indicators
-
+<img width="1920" height="1080" alt="Screenshot (1384)" src="https://github.com/user-attachments/assets/27a0b52e-bc4e-4c9c-bc5b-dbdf47c16144" />
 Built-in indicators include:
 
 - RSI
